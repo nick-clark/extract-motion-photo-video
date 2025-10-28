@@ -125,7 +125,52 @@ class MainActivity : AppCompatActivity() {
     private fun extractMp4FromJpeg(jpegFile: File): ByteArray? {
         val data = jpegFile.readBytes()
         
-        // Look for MP4 file signature (ftyp box)
+        // Find JPEG end marker (0xFF 0xD9)
+        var jpegEndOffset = -1
+        for (i in 0 until data.size - 1) {
+            if (data[i].toInt() == 0xFF && data[i + 1].toInt() == 0xD9) {
+                jpegEndOffset = i + 2
+                break
+            }
+        }
+        
+        if (jpegEndOffset == -1) {
+            // No JPEG end marker found, try old method
+            return extractMp4OldMethod(data)
+        }
+        
+        // The MP4 should start after JPEG end
+        // Look for 'ftyp' box after JPEG end
+        var mp4Start = -1
+        for (i in jpegEndOffset until data.size - 3) {
+            if (data[i] == 'f'.code.toByte() && 
+                data[i+1] == 't'.code.toByte() && 
+                data[i+2] == 'y'.code.toByte() && 
+                data[i+3] == 'p'.code.toByte()) {
+                
+                // Found ftyp, MP4 starts 4 bytes before (box size)
+                mp4Start = if (i >= 4) i - 4 else i
+                break
+            }
+        }
+        
+        if (mp4Start == -1) {
+            return null
+        }
+        
+        // Extract the MP4 data
+        val mp4Data = data.sliceArray(mp4Start until data.size)
+        
+        // Verify it's a valid MP4
+        if (isValidMp4(mp4Data)) {
+            return mp4Data
+        }
+        
+        return null
+    }
+    
+    // Fallback to old extraction method
+    private fun extractMp4OldMethod(data: ByteArray): ByteArray? {
         for (i in data.indices) {
             if (i + 20 < data.size && 
                 data[i] == 'f'.code.toByte() && 
@@ -133,17 +178,13 @@ class MainActivity : AppCompatActivity() {
                 data[i+2] == 'y'.code.toByte() && 
                 data[i+3] == 'p'.code.toByte()) {
                 
-                // Found ftyp, check if it's preceded by a size
                 val startOffset = if (i >= 4) i - 4 else i
-                
-                // Verify this looks like a valid MP4
                 val mp4Data = data.sliceArray(startOffset until data.size)
                 if (isValidMp4(mp4Data)) {
                     return mp4Data
                 }
             }
         }
-        
         return null
     }
     
