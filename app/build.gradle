@@ -3,19 +3,14 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-repositories {
-    google()
-    mavenCentral()
-}
-
 android {
     namespace 'com.motionphoto.extractor'
-    compileSdk 34
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "com.motionphoto.extractor"
-        minSdk 24
-        targetSdk 34
+        minSdkVersion 24
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
     }
