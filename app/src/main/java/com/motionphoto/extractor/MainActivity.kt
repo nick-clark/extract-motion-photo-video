@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +22,9 @@ import java.util.ArrayList
 class MainActivity : AppCompatActivity() {
     
     private lateinit var extractedVideoFiles: List<File>
+    private var progressBar: ProgressBar? = null
+    private var statusText: TextView? = null
+    private var countText: TextView? = null
     
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -78,6 +83,9 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
+        // Show progress UI
+        showProgressUI(imageUris.size)
+        
         // Extract videos in background
         Thread {
             extractedVideoFiles = extractVideosFromImages(imageUris)
@@ -93,11 +101,37 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
     
+    private fun showProgressUI(totalFiles: Int) {
+        setContentView(R.layout.activity_progress)
+        progressBar = findViewById(R.id.progressBar)
+        statusText = findViewById(R.id.statusText)
+        countText = findViewById(R.id.countText)
+        
+        progressBar?.max = 100
+        countText?.text = "0 / $totalFiles"
+    }
+    
+    private fun updateProgress(currentFile: Int, totalFiles: Int, fileName: String) {
+        runOnUiThread {
+            val progress = ((currentFile.toFloat() / totalFiles.toFloat()) * 100).toInt()
+            progressBar?.progress = progress
+            statusText?.text = "Extracting: $fileName"
+            countText?.text = "$currentFile / $totalFiles"
+        }
+    }
+    
     private fun extractVideosFromImages(imageUris: ArrayList<Uri>): List<File> {
         val extractedFiles = mutableListOf<File>()
+        val totalFiles = imageUris.size
         
-        for (uri in imageUris) {
+        for ((index, uri) in imageUris.withIndex()) {
             try {
+                // Get filename from URI
+                val fileName = getFileNameFromUri(uri)
+                
+                // Update progress
+                updateProgress(index, totalFiles, fileName)
+                
                 contentResolver.openInputStream(uri)?.use { inputStream ->
                     val tempFile = File.createTempFile("motion_", ".jpg", cacheDir)
                     FileOutputStream(tempFile).use { inputStream.copyTo(it) }
@@ -119,7 +153,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
+        // Final progress update
+        updateProgress(totalFiles, totalFiles, "Complete")
+        
         return extractedFiles
+    }
+    
+    private fun getFileNameFromUri(uri: Uri): String {
+        return try {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            val nameIndex = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            cursor?.moveToFirst()
+            val fileName = cursor?.getString(nameIndex ?: 0) ?: "photo"
+            cursor?.close()
+            fileName
+        } catch (e: Exception) {
+            "photo"
+        }
     }
     
     private fun extractMp4FromJpeg(jpegFile: File): ByteArray? {
