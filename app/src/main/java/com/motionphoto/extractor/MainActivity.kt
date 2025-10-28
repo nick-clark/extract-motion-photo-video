@@ -28,20 +28,32 @@ class MainActivity : AppCompatActivity() {
             processSharedFiles(intent)
         } else {
             Toast.makeText(this, "Permission needed to access photos", Toast.LENGTH_SHORT).show()
-            finish()
+            showInstructions()
         }
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Check permissions for Android 13+ (READ_MEDIA_IMAGES)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) 
-            != PackageManager.PERMISSION_GRANTED) {
-            permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+        // Check if opened with a share intent
+        val hasShareIntent = intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE
+        
+        if (hasShareIntent) {
+            // Check permissions for Android 13+ (READ_MEDIA_IMAGES)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+            } else {
+                processSharedFiles(intent)
+            }
         } else {
-            processSharedFiles(intent)
+            // Just opened the app - show instructions
+            showInstructions()
         }
+    }
+    
+    private fun showInstructions() {
+        setContentView(R.layout.activity_main)
     }
     
     private fun processSharedFiles(intent: Intent?) {
